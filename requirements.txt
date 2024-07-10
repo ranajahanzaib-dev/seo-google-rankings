@@ -1,0 +1,8 @@
+Flask==2.3.2
+Flask-CORS==4.0.0
+requests==2.31.0
+beautifulsoup4==4.12.2
+pandas==2.0.3
+termcolor==2.3.0
+halo==0.0.31
+openpyxl==3.1.2
