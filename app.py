@@ -124,7 +124,8 @@ def send_data_to_php(data):
 def get_rankings():
     # Fetch keywords and URLs from get_keywords.php
     keywords_url = 'https://area.zeetach.com/data/request/get_keywords.php'
-    keywords_data = requests.get(keywords_url).json()
+    # keywords_data = requests.get(keywords_url).json()
+    keywords_data = requests.get(keywords_url, verify=False).json()
 
     if 'keywords' in keywords_data and 'urls' in keywords_data:
         keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
