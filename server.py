@@ -1,5 +1,5 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS  # Add this import
+from flask import Flask, jsonify
+from flask_cors import CORS
 import requests
 import random
 from bs4 import BeautifulSoup
@@ -56,9 +56,8 @@ def rank_check(sitename, serp_df, keyword, type):
     
     return df
 
-def get_data(keywords, sitename, device):
-    # Google Search URL
-    google_url = 'https://www.google.com/search?num=100&q='
+def get_data(keywords_urls, device):
+    google_uk_url = 'https://www.google.co.uk/search?num=100&q='  # UK-specific Google search URL
 
     if device.lower() == 'mobile':
         print(colored("- Checking Mobile Rankings" ,'black',attrs=['bold']))
@@ -66,16 +65,19 @@ def get_data(keywords, sitename, device):
         headers = {'User-Agent': useragent}
         print(headers)
     elif device.lower() == 'desktop':
-        print(colored("- Checking  Desktop Rankings" ,'black',attrs=['bold']))
+        print(colored("- Checking Desktop Rankings" ,'black',attrs=['bold']))
         useragent = random.choice(desktop_agent)      
         headers = {'User-Agent': useragent}
         print(headers)
 
     results = pd.DataFrame()
     
-    for keyword in keywords:
+    for keyword_url in keywords_urls:
+        keyword = keyword_url['keyword']
+        sitename = keyword_url['url']
+        
         time.sleep(random.uniform(10, 20))
-        response = requests.get(google_url + keyword, headers=headers)
+        response = requests.get(google_uk_url + keyword, headers=headers)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -110,7 +112,7 @@ def get_data(keywords, sitename, device):
     return results
 
 def send_data_to_php(data):
-    url = 'http://localhost/keywordranking/client/save_data.php'
+    url = 'https://area.zeetach.com/data/request/save_data.php'
     headers = {'Content-Type': 'application/json'}
     response = requests.post(url, headers=headers, data=json.dumps(data))
     if response.status_code == 200:
@@ -120,12 +122,20 @@ def send_data_to_php(data):
 
 @app.route('/rankings', methods=['GET'])
 def get_rankings():
-    keywords = ['proukwritings', 'proukwritings.co.uk', 'uk-writings']
-    sitename = "https://proukwritings.co.uk/"
+    # Fetch keywords and URLs from get_keywords.php
+    keywords_url = 'https://area.zeetach.com/data/request/get_keywords.php'
+    keywords_data = requests.get(keywords_url).json()
 
-    mobile_results = get_data(keywords, sitename, 'mobile')
+    if 'keywords' in keywords_data and 'urls' in keywords_data:
+        keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
+    else:
+        keywords_urls = [
+            {'keyword': 'uk-writings', 'url': 'https://proukwritings.co.uk/'}
+        ]
+
+    mobile_results = get_data(keywords_urls, 'mobile')
     time.sleep(5)
-    desktop_results = get_data(keywords, sitename, 'desktop')
+    desktop_results = get_data(keywords_urls, 'desktop')
 
     response_data = {
         'mobile_results': mobile_results.to_dict(orient='records'),
