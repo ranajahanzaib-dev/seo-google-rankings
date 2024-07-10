@@ -1,10 +1,10 @@
-Flask==2.3.2
-Flask-CORS==4.0.0
-requests==2.31.0
-beautifulsoup4==4.12.2
-pandas==1.4.0  # Adjust the version as per compatibility
-termcolor==2.3.0
+Flask==3.0.3
+Flask-CORS==4.0.1
+requests==2.32.3
+beautifulsoup4==4.12.3
+pandas==2.2.2
+termcolor==2.4.0
 halo==0.0.31
-openpyxl==3.1.2
+openpyxl==3.1.5
 gunicorn==20.1.0
-numpy==1.22.2  # Specify a compatible version
+numpy==2.0.0
