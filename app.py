@@ -10,7 +10,7 @@ import json
 from termcolor import colored
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})  # Allow requests from all origins
 
 # Define user agents and other necessary variables
 mobile_agent = [
