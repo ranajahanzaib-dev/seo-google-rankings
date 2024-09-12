@@ -12,14 +12,7 @@ from termcolor import colored
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow requests from all origins
 
-# Define user agents and other necessary variables
-mobile_agent = [
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/114.0.5735.99 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/114.1 Mobile/15E148 Safari/605.1.15',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 EdgiOS/114.0.5735.99',
-]
-
+# Define desktop user agents
 desktop_agent = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
@@ -56,19 +49,13 @@ def rank_check(sitename, serp_df, keyword, type):
     
     return df
 
-def get_data(keywords_urls, device):
+def get_data(keywords_urls):
     google_uk_url = 'https://www.google.co.uk/search?num=100&q='  # UK-specific Google search URL
 
-    if device.lower() == 'mobile':
-        print(colored("- Checking Mobile Rankings" ,'black',attrs=['bold']))
-        useragent = random.choice(mobile_agent)      
-        headers = {'User-Agent': useragent}
-        print(headers)
-    elif device.lower() == 'desktop':
-        print(colored("- Checking Desktop Rankings" ,'black',attrs=['bold']))
-        useragent = random.choice(desktop_agent)      
-        headers = {'User-Agent': useragent}
-        print(headers)
+    print(colored("- Checking Desktop Rankings" ,'black',attrs=['bold']))
+    useragent = random.choice(desktop_agent)      
+    headers = {'User-Agent': useragent}
+    print(headers)
 
     results = pd.DataFrame()
     
@@ -81,11 +68,7 @@ def get_data(keywords_urls, device):
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            
-            if device.lower() == 'mobile':
-                urls = soup.find_all('div', class_="P8ujBc")
-            elif device.lower() == 'desktop':
-                urls = soup.find_all('div', class_="yuRUbf")
+            urls = soup.find_all('div', class_="yuRUbf")
 
             data = []
             for div in urls:
@@ -133,12 +116,9 @@ def get_rankings():
             {'keyword': 'uk-writings', 'url': 'https://proukwritings.co.uk/'}
         ]
 
-    mobile_results = get_data(keywords_urls, 'mobile')
-    time.sleep(5)
-    desktop_results = get_data(keywords_urls, 'desktop')
+    desktop_results = get_data(keywords_urls)
 
     response_data = {
-        'mobile_results': mobile_results.to_dict(orient='records'),
         'desktop_results': desktop_results.to_dict(orient='records')
     }
 
