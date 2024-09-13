@@ -8,4 +8,4 @@ halo==0.0.31
 openpyxl==3.1.5
 gunicorn==20.1.0
 numpy==2.0.0
-APScheduler==3.9.1.post1
+APScheduler==3.10.4
