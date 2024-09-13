@@ -8,6 +8,7 @@ import datetime
 import time
 import json
 from termcolor import colored
+from threading import Thread
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow requests from all origins
@@ -126,5 +127,22 @@ def get_rankings():
 
     return jsonify(response_data)
 
+# Background function to fetch rankings every hour
+def fetch_rankings_periodically():
+    while True:
+        print("Fetching rankings automatically...")
+        try:
+            with app.app_context():  # Access Flask context to use app functions
+                get_rankings()
+        except Exception as e:
+            print(f"Error fetching rankings: {e}")
+        time.sleep(3600)  # Wait for 1 hour (3600 seconds)
+
 if __name__ == '__main__':
+    # Start the background thread
+    background_thread = Thread(target=fetch_rankings_periodically)
+    background_thread.daemon = True
+    background_thread.start()
+
+    # Start the Flask application
     app.run(debug=True)
