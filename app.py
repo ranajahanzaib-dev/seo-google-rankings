@@ -136,7 +136,7 @@ def fetch_rankings_periodically():
                 get_rankings()
         except Exception as e:
             print(f"Error fetching rankings: {e}")
-        time.sleep(3600)  # Wait for 1 hour (3600 seconds)
+        time.sleep(300)  # Wait for 1 hour (3600 seconds)
 
 if __name__ == '__main__':
     # Start the background thread
