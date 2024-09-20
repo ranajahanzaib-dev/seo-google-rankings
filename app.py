@@ -8,7 +8,6 @@ import datetime
 import time
 import json
 from termcolor import colored
-from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow requests from all origins
@@ -25,6 +24,7 @@ def clean_url(url):
     start = url.find('https://')
     if start == -1:
         return None
+
     end = url.find('&ved', start)
     if end == -1:
         return url[start:]
@@ -126,15 +126,5 @@ def get_rankings():
 
     return jsonify(response_data)
 
-# Function to automatically trigger the get_rankings function
-def scheduled_rankings_check():
-    with app.app_context():
-        print("Scheduled check running...")
-        get_rankings()
-
 if __name__ == '__main__':
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_rankings_check, 'interval', minutes=5)  # Run every 5 minutes
-    scheduler.start()
-
     app.run(debug=True)
