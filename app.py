@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from flask_cors import CORS
 import requests
 import random
@@ -7,7 +7,6 @@ import pandas as pd
 import datetime
 import time
 import json
-from termcolor import colored
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow requests from all origins
@@ -19,11 +18,6 @@ desktop_agent = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:105.0) Gecko/20100101 Firefox/105.0',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:15.0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15',
 ]
-
-# Global counter for tracking the keyword offset
-current_offset = 0
-batch_size = 10  # Number of keywords to fetch in each request
-total_keywords = 120  # Total number of keywords in the database (adjust as necessary)
 
 def clean_url(url):
     start = url.find('https://')
@@ -43,34 +37,32 @@ def rank_check(sitename, serp_df, keyword, type):
         counter += 1
         if sitename in str(i):
             rank = counter
-            url = i 
+            url = i
             now = datetime.date.today().strftime("%d-%m-%Y")
             d.append([keyword, rank, url, now, type])
-    
+
     if d:
         df = pd.DataFrame(d, columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type'])
     else:
         df = pd.DataFrame(columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type'])
-    
+
     return df
 
 def get_data(keywords_urls):
-    google_uk_url = 'https://www.google.co.uk/search?num=100&q='  # UK-specific Google search URL
+    google_uk_url = 'https://www.google.co.uk/search?num=100&q='
 
-    print(colored("- Checking Desktop Rankings", 'black', attrs=['bold']))
     useragent = random.choice(desktop_agent)      
     headers = {'User-Agent': useragent}
-    print(headers)
 
     results = pd.DataFrame()
-    
+
     for keyword_url in keywords_urls:
         keyword = keyword_url['keyword']
         sitename = keyword_url['url']
-        
+
         time.sleep(random.uniform(10, 20))
         response = requests.get(google_uk_url + keyword, headers=headers)
-        
+
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             urls = soup.find_all('div', class_="yuRUbf")
@@ -110,43 +102,39 @@ def send_data_to_php(data):
 
 @app.route('/rankings', methods=['GET'])
 def get_rankings():
-    global current_offset  # Access the global offset variable
+    keywords_url = 'https://area.zeetach.com/data/request/get_keywords.php'
 
-    # Calculate the offset for the current batch of keywords
-    start_index = current_offset
-    end_index = current_offset + batch_size
+    try:
+        response = requests.get(keywords_url)
+        if response.status_code == 200:
+            try:
+                keywords_data = response.json()
+            except json.JSONDecodeError:
+                print(f"Error decoding JSON from {keywords_url}: {response.text}")
+                return jsonify({"error": "Invalid JSON response from server"}), 500
+        else:
+            print(f"Failed to fetch keywords. Status code: {response.status_code}")
+            return jsonify({"error": f"Failed to fetch keywords, status code: {response.status_code}"}), 500
 
-    # If end_index exceeds total keywords, reset to 0
-    if end_index > total_keywords:
-        end_index = total_keywords
-        current_offset = 0  # Reset offset to 0 for the next request
-    else:
-        # Move the offset to the next batch for subsequent requests
-        current_offset = end_index
+        if 'keywords' in keywords_data and 'urls' in keywords_data:
+            keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
+        else:
+            print(f"Invalid data format: {keywords_data}")
+            return jsonify({"error": "Invalid data format from keywords server"}), 500
 
-    # Fetch keywords and URLs from get_keywords.php based on the calculated offset
-    keywords_url = f'https://area.zeetach.com/data/request/get_keywords.php?start={start_index}&end={end_index}'
-    keywords_data = requests.get(keywords_url).json()
+        desktop_results = get_data(keywords_urls)
 
-    if 'keywords' in keywords_data and 'urls' in keywords_data:
-        # Parse keywords and URLs from the response
-        keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
-    else:
-        keywords_urls = []
+        response_data = {
+            'desktop_results': desktop_results.to_dict(orient='records')
+        }
 
-    # Process the keyword rankings
-    desktop_results = get_data(keywords_urls)
+        send_data_to_php(response_data)
 
-    # Prepare the response
-    response_data = {
-        'desktop_results': desktop_results.to_dict(orient='records'),
-        'current_offset': current_offset  # Include the current offset in the response
-    }
+        return jsonify(response_data)
 
-    # Send the data to the PHP script
-    send_data_to_php(response_data)
-
-    return jsonify(response_data)
+    except requests.RequestException as e:
+        print(f"Error fetching keywords: {str(e)}")
+        return jsonify({"error": f"Error fetching keywords: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
