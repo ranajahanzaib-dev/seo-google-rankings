@@ -51,7 +51,7 @@ def rank_check(sitename, serp_df, keyword, type):
 def get_data(keywords_urls):
     google_uk_url = 'https://www.google.co.uk/search?num=100&q='  # UK-specific Google search URL
 
-    print(colored("- Checking Desktop Rankings" ,'black',attrs=['bold']))
+    print(colored("- Checking Desktop Rankings", 'black', attrs=['bold']))
     useragent = random.choice(desktop_agent)      
     headers = {'User-Agent': useragent}
     print(headers)
@@ -118,7 +118,12 @@ def get_rankings():
     keywords_url = f'https://area.zeetach.com/data/request/get_keywords.php?start={start}&end={end}'
     
     try:
-        keywords_data = requests.get(keywords_url).json()
+        response = requests.get(keywords_url)
+        response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
+        keywords_data = response.json()  # Attempt to parse JSON response
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Failed to retrieve data from the PHP endpoint: {str(e)}'}), 500
     except json.decoder.JSONDecodeError:
         return jsonify({'error': 'Failed to retrieve valid data from the PHP endpoint.'}), 500
 
