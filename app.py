@@ -7,6 +7,7 @@ import pandas as pd
 import datetime
 import time
 import json
+from termcolor import colored
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow requests from all origins
@@ -23,7 +24,6 @@ def clean_url(url):
     start = url.find('https://')
     if start == -1:
         return None
-
     end = url.find('&ved', start)
     if end == -1:
         return url[start:]
@@ -37,32 +37,34 @@ def rank_check(sitename, serp_df, keyword, type):
         counter += 1
         if sitename in str(i):
             rank = counter
-            url = i
+            url = i 
             now = datetime.date.today().strftime("%d-%m-%Y")
             d.append([keyword, rank, url, now, type])
-
+    
     if d:
         df = pd.DataFrame(d, columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type'])
     else:
         df = pd.DataFrame(columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type'])
-
+    
     return df
 
 def get_data(keywords_urls):
-    google_uk_url = 'https://www.google.co.uk/search?num=100&q='
+    google_uk_url = 'https://www.google.co.uk/search?num=100&q='  # UK-specific Google search URL
 
+    print(colored("- Checking Desktop Rankings" ,'black',attrs=['bold']))
     useragent = random.choice(desktop_agent)      
     headers = {'User-Agent': useragent}
+    print(headers)
 
     results = pd.DataFrame()
-
+    
     for keyword_url in keywords_urls:
         keyword = keyword_url['keyword']
         sitename = keyword_url['url']
-
+        
         time.sleep(random.uniform(10, 20))
         response = requests.get(google_uk_url + keyword, headers=headers)
-
+        
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             urls = soup.find_all('div', class_="yuRUbf")
@@ -102,39 +104,42 @@ def send_data_to_php(data):
 
 @app.route('/rankings', methods=['GET'])
 def get_rankings():
-    keywords_url = 'https://area.zeetach.com/data/request/get_keywords.php'
-
+    # Fetch the current request count from a file (or database) to implement the pagination logic
     try:
-        response = requests.get(keywords_url)
-        if response.status_code == 200:
-            try:
-                keywords_data = response.json()
-            except json.JSONDecodeError:
-                print(f"Error decoding JSON from {keywords_url}: {response.text}")
-                return jsonify({"error": "Invalid JSON response from server"}), 500
-        else:
-            print(f"Failed to fetch keywords. Status code: {response.status_code}")
-            return jsonify({"error": f"Failed to fetch keywords, status code: {response.status_code}"}), 500
+        with open('request_counter.txt', 'r') as f:
+            request_count = int(f.read().strip())
+    except FileNotFoundError:
+        request_count = 0
+    
+    # Calculate the start and end based on the request count (increments of 10)
+    start = (request_count * 10) % 120  # Reset after 120
+    end = start + 10
 
-        if 'keywords' in keywords_data and 'urls' in keywords_data:
-            keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
-        else:
-            print(f"Invalid data format: {keywords_data}")
-            return jsonify({"error": "Invalid data format from keywords server"}), 500
+    keywords_url = f'https://area.zeetach.com/data/request/get_keywords.php?start={start}&end={end}'
+    
+    try:
+        keywords_data = requests.get(keywords_url).json()
+    except json.decoder.JSONDecodeError:
+        return jsonify({'error': 'Failed to retrieve valid data from the PHP endpoint.'}), 500
 
-        desktop_results = get_data(keywords_urls)
+    if 'keywords' in keywords_data and 'urls' in keywords_data:
+        keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
+    else:
+        return jsonify({'error': 'No keywords or URLs found in the PHP response.'}), 500
 
-        response_data = {
-            'desktop_results': desktop_results.to_dict(orient='records')
-        }
+    desktop_results = get_data(keywords_urls)
 
-        send_data_to_php(response_data)
+    response_data = {
+        'desktop_results': desktop_results.to_dict(orient='records')
+    }
 
-        return jsonify(response_data)
+    send_data_to_php(response_data)
 
-    except requests.RequestException as e:
-        print(f"Error fetching keywords: {str(e)}")
-        return jsonify({"error": f"Error fetching keywords: {str(e)}"}), 500
+    # Update the request counter
+    with open('request_counter.txt', 'w') as f:
+        f.write(str(request_count + 1))
+
+    return jsonify(response_data)
 
 if __name__ == '__main__':
     app.run(debug=True)
