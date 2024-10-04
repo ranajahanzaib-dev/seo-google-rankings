@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
 import random
@@ -20,16 +20,16 @@ desktop_agent = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:15.0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15',
 ]
 
+# Initialize batch counter (global)
+current_batch = 1
+max_batch = 6  # For batches 1-6, representing 1-120 keywords
+
 def clean_url(url):
     start = url.find('https://')
     if start == -1:
         return None
-
     end = url.find('&ved', start)
-    if end == -1:
-        return url[start:]
-    else:
-        return url[start:end]
+    return url[start:end] if end != -1 else url[start:]
 
 def rank_check(sitename, serp_df, keyword, type):
     counter = 0
@@ -42,18 +42,13 @@ def rank_check(sitename, serp_df, keyword, type):
             now = datetime.date.today().strftime("%d-%m-%Y")
             d.append([keyword, rank, url, now, type])
     
-    if d:
-        df = pd.DataFrame(d, columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type'])
-    else:
-        df = pd.DataFrame(columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type'])
-    
-    return df
+    return pd.DataFrame(d, columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type']) if d else pd.DataFrame(columns=['Keyword', 'Rank', 'URLs', 'Date', 'Type'])
 
 def get_data(keywords_urls):
     google_uk_url = 'https://www.google.co.uk/search?num=100&q='  # UK-specific Google search URL
 
-    print(colored("- Checking Desktop Rankings" ,'black',attrs=['bold']))
-    useragent = random.choice(desktop_agent)      
+    print(colored("- Checking Desktop Rankings" ,'black', attrs=['bold']))
+    useragent = random.choice(desktop_agent)
     headers = {'User-Agent': useragent}
     print(headers)
 
@@ -74,11 +69,7 @@ def get_data(keywords_urls):
             for div in urls:
                 soup = BeautifulSoup(str(div), 'html.parser')
                 url_anchor = soup.find('a')
-                if url_anchor:
-                    url = url_anchor.get('href', "No URL")
-                else:
-                    url = "No URL"
-                url = clean_url(url)
+                url = clean_url(url_anchor.get('href', "No URL")) if url_anchor else "No URL"
                 data.append(url)
 
             serp_df = pd.DataFrame(data, columns=['URLs']).dropna(subset=['URLs'])
@@ -105,21 +96,27 @@ def send_data_to_php(data):
 
 @app.route('/rankings', methods=['GET'])
 def get_rankings():
-    # Fetch keywords and URLs from get_keywords.php
-    keywords_url = 'https://area.zeetach.com/data/request/get_keywords.php'
+    global current_batch
+
+    # Fetch keywords and URLs from PHP with the current batch
+    keywords_url = f'https://area.zeetach.com/data/request/get_keywords.php?batch={current_batch}'
     keywords_data = requests.get(keywords_url).json()
 
     if 'keywords' in keywords_data and 'urls' in keywords_data:
         keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
     else:
-        keywords_urls = [
-            {'keyword': 'uk-writings', 'url': 'https://proukwritings.co.uk/'}
-        ]
+        return jsonify({'error': 'No keywords found'})
+
+    # Increment or reset the batch counter after reaching max_batch
+    current_batch += 1
+    if current_batch > max_batch:
+        current_batch = 1  # Reset the batch
 
     desktop_results = get_data(keywords_urls)
 
     response_data = {
-        'desktop_results': desktop_results.to_dict(orient='records')
+        'desktop_results': desktop_results.to_dict(orient='records'),
+        'current_batch': current_batch  # Return current batch for reference
     }
 
     send_data_to_php(response_data)
