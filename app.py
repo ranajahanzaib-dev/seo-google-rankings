@@ -128,6 +128,7 @@ def get_rankings():
         return jsonify({'error': 'Failed to retrieve valid data from the PHP endpoint.'}), 500
 
     if 'keywords' in keywords_data and 'urls' in keywords_data:
+        # Create the keywords_urls list based on the response structure
         keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
     else:
         return jsonify({'error': 'No keywords or URLs found in the PHP response.'}), 500
