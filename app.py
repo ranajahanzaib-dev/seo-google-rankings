@@ -146,6 +146,5 @@ def get_rankings():
         f.write(str(request_count + 1))
 
     return jsonify(response_data)
-
 if __name__ == '__main__':
     app.run(debug=True)
