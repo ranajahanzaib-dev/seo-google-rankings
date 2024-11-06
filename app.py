@@ -1,11 +1,10 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
 import random
 from bs4 import BeautifulSoup
 import pandas as pd
 import datetime
-import time
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -92,32 +91,38 @@ def send_data_to_php(data):
 
 @app.route('/rankings', methods=['GET'])
 def get_rankings():
-    """Handle the '/rankings' endpoint."""
-    try:
-        with open('request_counter.txt', 'r') as f:
-            request_count = int(f.read().strip())
-    except FileNotFoundError:
-        request_count = 0
+    """Handle the '/rankings' endpoint with predefined keywords or query parameters."""
+
+    # **Option 1**: Hardcoded keywords and URLs (use for quick testing)
+    keywords_urls = [
+        {'keyword': 'Assignment Help London	', 'url': 'https://www.assignmentguru.co.uk/assignment-help-london'},
+        {'keyword': 'CIPD Assignment Help', 'url': 'https://www.assignmentguru.co.uk/cipd-assignment-help'},
+        {'keyword': 'Dissertation Help London', 'url': 'https://www.assignmentguru.co.uk/dissertation-help-london'},
+        # Add more keywords and URLs as needed
+    ]
     
-    # Calculate the start and end based on the request count (increments of 10)
-    start = (request_count * 10) % 120
-    end = start + 10
-    keywords_url = f'https://area.zeetach.com/data/request/get_keywords.php?start={start}&end={end}'
+    # **Option 2**: Use query parameters for dynamic keywords (remove hardcoded part if using this)
+    # Check if 'keywords' is passed in the query string
+    # keywords_param = request.args.get('keywords')
+    
+    # Uncomment this section if you want to use query parameters instead of hardcoded keywords
+    """
+    keywords_param = request.args.get('keywords')
+    
+    if not keywords_param:
+        return jsonify({'error': 'No keywords provided.'}), 400
 
+    # Parse the 'keywords' parameter (assumes comma-separated list of keywords and URLs)
     try:
-        response = requests.get(keywords_url)
-        response.raise_for_status()
-        keywords_data = response.json()
-    except requests.exceptions.RequestException as e:
-        return jsonify({'error': f'Failed to retrieve data from the PHP endpoint: {str(e)}'}), 500
-    except json.decoder.JSONDecodeError:
-        return jsonify({'error': 'Failed to retrieve valid data from the PHP endpoint.'}), 500
-
-    if 'keywords' in keywords_data and 'urls' in keywords_data:
-        keywords_urls = [{'keyword': keywords_data['keywords'][i], 'url': keywords_data['urls'][i]['url']} for i in range(len(keywords_data['keywords']))]
-    else:
-        return jsonify({'error': 'No keywords or URLs found in the PHP response.'}), 500
-
+        keywords_urls = []
+        for item in keywords_param.split(','):
+            keyword, url = item.split('|')
+            keywords_urls.append({'keyword': keyword.strip(), 'url': url.strip()})
+    except ValueError:
+        return jsonify({'error': 'Invalid format. Please provide keywords and URLs in "keyword|url" format.'}), 400
+    """
+    
+    # Fetch ranking data using the provided keywords and URLs
     desktop_results = get_data(keywords_urls)
 
     response_data = {
@@ -126,10 +131,7 @@ def get_rankings():
 
     send_data_to_php(response_data)
 
-    # Update the request counter
-    with open('request_counter.txt', 'w') as f:
-        f.write(str(request_count + 1))
-
+    # Return the ranking data as a JSON response
     return jsonify(response_data)
 
 if __name__ == '__main__':
